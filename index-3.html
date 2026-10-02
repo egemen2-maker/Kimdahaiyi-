@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kim Daha İyi?</title>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=DM+Sans:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ffd23f;--ink:#1b1b3a;--pink:#ee4266;--mint:#3bceac;--card:#fff8e1}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font:500 1rem/1.4 "DM Sans",system-ui,sans-serif;display:flex;justify-content:center}
+main{width:100%;max-width:440px;padding:22px 18px calc(22px + env(safe-area-inset-bottom))}
+h1{font:2.4rem/1 "Bowlby One",Impact,sans-serif;margin:8px 0 22px;transform:rotate(-2deg)}
+.card{background:var(--card);border:3px solid var(--ink);border-radius:14px;box-shadow:5px 5px 0 var(--ink);padding:16px;margin-bottom:16px}
+input{width:100%;padding:13px;border:3px solid var(--ink);border-radius:10px;background:#fff;font:700 1.1rem "DM Sans",sans-serif;color:var(--ink);margin-bottom:10px}
+input:focus,button:focus-visible{outline:3px solid var(--pink);outline-offset:2px}
+button{width:100%;padding:13px;border:3px solid var(--ink);border-radius:10px;background:var(--pink);color:#fff;font:700 1.1rem "DM Sans",sans-serif;box-shadow:3px 3px 0 var(--ink);margin-bottom:10px;cursor:pointer}
+button:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+button.alt{background:var(--mint);color:var(--ink)}
+.hidden{display:none!important}
+.code{font:2.6rem/1 "Bowlby One",Impact,sans-serif;letter-spacing:.15em;text-align:center;margin:4px 0 10px}
+.small{font-size:.9rem;opacity:.75;text-align:center;margin:6px 0}
+ol{list-style:none;margin:0;padding:0}
+li{display:flex;justify-content:space-between;padding:9px 4px;border-bottom:2px dashed #1b1b3a33;font-weight:700}
+li:last-child{border:0}li.me{color:var(--pink)}
+#tap{width:230px;height:230px;margin:6px auto 18px;border-radius:50%;border:4px solid var(--ink);background:var(--pink);box-shadow:7px 7px 0 var(--ink);color:#fff;font:4rem "Bowlby One",Impact,sans-serif;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+#tap.off{background:#b9b2a0;box-shadow:3px 3px 0 var(--ink)}
+#tap:active:not(.off){transform:translate(5px,5px);box-shadow:2px 2px 0 var(--ink)}
+#info{text-align:center;font:1.5rem "Bowlby One",Impact,sans-serif;min-height:1.8rem}
+#tap.go{background:var(--mint);color:var(--ink)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tabs button{flex:1;width:auto;margin:0;padding:9px 6px;font-size:.9rem;background:#fff;color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
+.tabs button.sel{background:var(--ink);color:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid button{margin:0;padding:18px 0;font-size:1.5rem;background:#fff;color:var(--ink)}
+#q{font:2.8rem "Bowlby One",Impact,sans-serif;text-align:center;margin:8px 0 16px}
+@media(prefers-reduced-motion:no-preference){h1{transition:transform .3s}}
+</style>
+</head>
+<body>
+<main>
+<h1>Kim Daha İyi?</h1>
+
+<section id="s-home">
+  <div class="card">
+    <input id="name" maxlength="14" placeholder="Adın" autocomplete="off">
+    <button id="create">Oda kur</button>
+    <input id="join-code" maxlength="4" placeholder="Oda kodu" autocomplete="off" style="text-transform:uppercase">
+    <button class="alt" id="join">Odaya katıl</button>
+    <button class="alt" id="open-lb">🏆 Skor tablosu</button>
+    <p class="small" id="mode"></p>
+  </div>
+</section>
+
+<section id="s-lobby" class="hidden">
+  <div class="card">
+    <div class="small">Oda kodu</div>
+    <div class="code" id="code"></div>
+    <button class="alt" id="share">Linki paylaş</button>
+  </div>
+  <div class="card"><ol id="lobby-list"></ol></div>
+  <div id="picker" class="tabs"></div>
+  <button id="start">Oyunu başlat</button>
+  <p class="small" id="wait">Oyunu oda kuran başlatır.</p>
+</section>
+
+<section id="s-game" class="hidden">
+  <div id="info"></div>
+  <div id="tap" class="off">0</div>
+  <div id="quiz" class="hidden"><div id="q"></div><div class="grid" id="choices"></div></div>
+  <div class="card"><ol id="game-list"></ol></div>
+  <button id="again" class="hidden">Lobiye dön</button>
+</section>
+<section id="s-lb" class="hidden">
+  <div id="lb-tabs" class="tabs"></div>
+  <div class="card"><ol id="lb-list"></ol></div>
+  <button class="alt" id="lb-back">Geri</button>
+</section>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// 1) Firebase ayarlarını buraya yapıştır (boş bırakırsan tek kişilik deneme modu açılır)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCP-gG3eC3iD6EatLFp-AhJpgoJCTKlVw8",
+  authDomain: "kimdahaiyi.firebaseapp.com",
+  databaseURL: "https://kimdahaiyi-default-rtdb.firebaseio.com", // Realtime Database sayfasındaki adresle aynı olmalı
+  projectId: "kimdahaiyi",
+  appId: "1:374686028717:web:64ac50fd1251ff5d644724"
+};
+
+const LEAD = 3000;
+const GAMES = {
+  tap:    { n: 'Basma yarışı', low: false, dur: 10000 },
+  math:   { n: 'Hızlı hesap',  low: false, dur: 15000 },
+  reflex: { n: 'Refleks',      low: true,  dur: 3000 }
+};
+const online = !!FIREBASE_CONFIG.apiKey;
+const $ = id => document.getElementById(id);
+let db, offset = 0;
+if (online) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+  db.ref('.info/serverTimeOffset').on('value', s => offset = s.val() || 0);
+}
+const now = () => Date.now() + offset;
+
+let uid;
+try { uid = localStorage.getItem('kdi-uid'); } catch (e) {}
+if (!uid) { uid = Math.random().toString(36).slice(2, 10); try { localStorage.setItem('kdi-uid', uid); } catch (e) {} }
+const me = { id: uid };
+let room = '', isHost = false, players = {}, lastRound = null, score = null;
+let canTap = false, timer, game = 'tap', pick = 'tap', answer = 0, greenAt = 0, settled = false;
+
+$('mode').textContent = online ? '' : 'Firebase ayarı yok: tek kişilik deneme modu.';
+const q = new URLSearchParams(location.search).get('oda');
+if (q) $('join-code').value = q.toUpperCase();
+try { $('name').value = localStorage.getItem('kdi-name') || ''; } catch (e) {}
+
+function show(id) {
+  ['s-home', 's-lobby', 's-game', 's-lb'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+}
+function newCode() {
+  const L = 'ABCDEFGHJKLMNPRSTUVYZ';
+  return Array.from({ length: 4 }, () => L[Math.random() * L.length | 0]).join('');
+}
+function myName() {
+  const n = $('name').value.trim() || 'Oyuncu';
+  try { localStorage.setItem('kdi-name', n); } catch (e) {}
+  return n;
+}
+const endAt = st => st.startAt + (st.game === 'reflex' ? st.delay : 0) + GAMES[st.game].dur;
+
+// ---------- oda ----------
+function drawPicker() {
+  const p = $('picker'); p.innerHTML = '';
+  p.classList.toggle('hidden', !isHost);
+  Object.entries(GAMES).forEach(([k, g]) => {
+    const b = document.createElement('button');
+    b.textContent = g.n; b.className = k === pick ? 'sel' : '';
+    b.onclick = () => { pick = k; drawPicker(); };
+    p.appendChild(b);
+  });
+}
+function enter(code, host) {
+  room = code; isHost = host;
+  const name = myName();
+  players = { [me.id]: { name, score: null } };
+  if (online) {
+    const r = db.ref('rooms/' + code);
+    const mine = r.child('players/' + me.id);
+    mine.set({ name, score: null });
+    mine.onDisconnect().remove();
+    r.child('players').on('value', s => { players = s.val() || {}; render(); });
+    r.child('state').on('value', s => { if (s.val()) onState(s.val()); });
+  }
+  $('code').textContent = code;
+  $('start').classList.toggle('hidden', !host);
+  $('wait').classList.toggle('hidden', host);
+  drawPicker(); show('s-lobby'); render();
+}
+$('create').onclick = () => enter(newCode(), true);
+$('join').onclick = async () => {
+  const c = $('join-code').value.trim().toUpperCase();
+  if (c.length !== 4) return alert('4 harfli oda kodunu yaz.');
+  if (online) {
+    const s = await db.ref('rooms/' + c + '/players').once('value');
+    if (!s.exists()) return alert('Bu kodla açık bir oda yok.');
+  }
+  enter(c, false);
+};
+$('share').onclick = async () => {
+  const url = location.origin + location.pathname + '?oda=' + room;
+  try {
+    if (navigator.share) await navigator.share({ title: 'Kim Daha İyi?', text: 'Odaya gel: ' + room, url });
+    else { await navigator.clipboard.writeText(url); alert('Link kopyalandı.'); }
+  } catch (e) {}
+};
+
+function startRound() {
+  const st = { game: pick, startAt: now() + LEAD, round: Date.now(), delay: 1500 + (Math.random() * 3000 | 0) };
+  if (!online) return onState(st);
+  const u = {};
+  Object.keys(players).forEach(k => u[k + '/score'] = null);
+  db.ref('rooms/' + room + '/players').update(u)
+    .then(() => db.ref('rooms/' + room + '/state').set(st));
+}
+$('start').onclick = startRound;
+$('again').onclick = () => { drawPicker(); show('s-lobby'); };
+
+function onState(st) {
+  if (st.round === lastRound) return;
+  lastRound = st.round;
+  if (endAt(st) < now()) return; // eski tur
+  runGame(st);
+}
+
+// ---------- oyun ----------
+const info = t => $('info').textContent = t;
+function setTap(on) { canTap = on; $('tap').classList.toggle('off', !on); }
+function setScore(v) {
+  score = v;
+  players[me.id] = { ...(players[me.id] || {}), name: myName(), score: v };
+  if (online) db.ref('rooms/' + room + '/players/' + me.id + '/score').set(v);
+  render();
+}
+
+function runGame(st) {
+  clearInterval(timer);
+  game = st.game; settled = false; canTap = false;
+  const G = GAMES[game], end = endAt(st);
+  greenAt = st.startAt + st.delay;
+  score = null;
+  $('again').classList.add('hidden');
+  $('tap').classList.toggle('hidden', game === 'math');
+  $('quiz').classList.toggle('hidden', game !== 'math');
+  $('tap').classList.remove('go');
+  $('tap').textContent = game === 'tap' ? '0' : game === 'reflex' ? 'Bekle' : '';
+  if (game !== 'reflex') setScore(0); else setScore(null);
+  if (game === 'math') nextQ();
+  show('s-game');
+  timer = setInterval(() => {
+    const t = now() - st.startAt;
+    if (t < 0) { info('Hazır ol… ' + Math.ceil(-t / 1000)); setTap(false); return; }
+    if (now() >= end) return finish();
+    if (game === 'reflex') {
+      if (score === null) {
+        const go = t >= st.delay;
+        setTap(true);
+        $('tap').classList.toggle('go', go);
+        $('tap').textContent = go ? 'BAS!' : 'Bekle';
+        info(go ? 'Şimdi!' : 'Yeşili bekle…');
+      }
+    } else {
+      setTap(true);
+      info((game === 'tap' ? 'Bas bas bas! ' : 'Doğruyu seç! ') + Math.ceil((end - now()) / 1000) + ' sn');
+    }
+  }, 50);
+}
+
+$('tap').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (!canTap) return;
+  if (game === 'tap') {
+    setScore(score + 1);
+    $('tap').textContent = score;
+    if (navigator.vibrate) navigator.vibrate(15);
+  } else if (game === 'reflex') {
+    const t = now();
+    const v = t < greenAt ? 9999 : Math.round(t - greenAt);
+    setTap(false); $('tap').classList.remove('go');
+    $('tap').style.fontSize = '2.2rem';
+    $('tap').textContent = v >= 9999 ? 'Erken bastın' : v + ' ms';
+    setScore(v);
+  }
+});
+
+function nextQ() {
+  const a = 2 + Math.random() * 10 | 0, b = 2 + Math.random() * 10 | 0;
+  const op = ['+', '−', '×'][Math.random() * 3 | 0];
+  answer = op === '+' ? a + b : op === '−' ? a - b : a * b;
+  const set = new Set([answer]);
+  while (set.size < 4) set.add(answer + (Math.random() * 11 | 0) - 5);
+  $('q').textContent = a + ' ' + op + ' ' + b;
+  const c = $('choices'); c.innerHTML = '';
+  [...set].sort(() => Math.random() - .5).forEach(v => {
+    const b2 = document.createElement('button');
+    b2.textContent = v;
+    b2.onclick = () => {
+      if (!canTap) return;
+      if (v === answer) setScore(score + 1);
+      else if (navigator.vibrate) navigator.vibrate(60);
+      nextQ();
+    };
+    c.appendChild(b2);
+  });
+}
+
+function finish() {
+  clearInterval(timer); setTap(false);
+  if (game === 'reflex' && score === null) setScore(3000);
+  info('Sonuçlar…');
+  setTimeout(settle, 1200);
+}
+function settle() {
+  if (settled) return; settled = true;
+  const s = sorted(), top = s[0], G = GAMES[game];
+  info(top ? (top[0] === me.id ? 'Kazandın! 🎉' : top[1].name + ' kazandı') : 'Bitti');
+  $('again').classList.remove('hidden');
+  $('tap').style.fontSize = '';
+  const valid = score !== null && (G.low ? score < 3000 : score > 0);
+  if (!valid) return;
+  lbSubmit(game, score);
+  const rank = s.findIndex(x => x[0] === me.id);
+  if (online && s.length > 1 && rank >= 0 && rank < 3) addPoints([3, 2, 1][rank]);
+}
+
+// ---------- skor tablosu ----------
+const lsGet = () => { try { return JSON.parse(localStorage.getItem('kdi-lb')) || {}; } catch (e) { return {}; } };
+function lbSubmit(g, v) {
+  const low = GAMES[g].low, name = myName();
+  const better = c => c && (low ? c.best <= v : c.best >= v);
+  if (online) {
+    db.ref('leaderboard/' + g + '/' + me.id).transaction(c => better(c) ? { ...c, name } : { name, best: v });
+  } else {
+    const d = lsGet(); d[g] = d[g] || {};
+    if (!better(d[g][me.id])) d[g][me.id] = { name, best: v };
+    try { localStorage.setItem('kdi-lb', JSON.stringify(d)); } catch (e) {}
+  }
+}
+function addPoints(n) {
+  const name = myName();
+  db.ref('stats/' + me.id).transaction(c => ({
+    name, points: ((c && c.points) || 0) + n, wins: ((c && c.wins) || 0) + (n === 3 ? 1 : 0)
+  }));
+}
+async function lbLoad(tab) {
+  const rows = [];
+  const low = tab !== 'stats' && GAMES[tab].low;
+  if (online) {
+    const base = tab === 'stats' ? db.ref('stats').orderByChild('points') : db.ref('leaderboard/' + tab).orderByChild('best');
+    const s = await (low ? base.limitToFirst(20) : base.limitToLast(20)).once('value');
+    s.forEach(c => { rows.push({ id: c.key, ...c.val() }); });
+  } else if (tab !== 'stats') {
+    Object.entries(lsGet()[tab] || {}).forEach(([id, v]) => rows.push({ id, ...v }));
+  }
+  const key = tab === 'stats' ? 'points' : 'best';
+  rows.sort((a, b) => low ? a[key] - b[key] : b[key] - a[key]);
+  return rows;
+}
+let lbTab = 'stats';
+async function drawLb() {
+  const t = $('lb-tabs'); t.innerHTML = '';
+  [['stats', 'Genel'], ...Object.entries(GAMES).map(([k, g]) => [k, g.n])].forEach(([k, n]) => {
+    const b = document.createElement('button');
+    b.textContent = n; b.className = k === lbTab ? 'sel' : '';
+    b.onclick = () => { lbTab = k; drawLb(); };
+    t.appendChild(b);
+  });
+  const el = $('lb-list'); el.textContent = 'Yükleniyor…';
+  const rows = await lbLoad(lbTab);
+  el.innerHTML = '';
+  if (!rows.length) el.textContent = lbTab === 'stats' && !online ? 'Genel puan için Firebase gerekli.' : 'Henüz skor yok. İlk sen ol!';
+  rows.forEach((r, i) => {
+    const li = document.createElement('li');
+    if (r.id === me.id) li.className = 'me';
+    const a = document.createElement('span'), b = document.createElement('span');
+    a.textContent = (['🥇', '🥈', '🥉'][i] || (i + 1) + '.') + ' ' + r.name;
+    b.textContent = lbTab === 'stats' ? r.points + ' puan' : r.best + (GAMES[lbTab].low ? ' ms' : '');
+    li.append(a, b); el.appendChild(li);
+  });
+}
+let lbFrom = 's-home';
+$('open-lb').onclick = () => { lbFrom = 's-home'; show('s-lb'); drawLb(); };
+$('lb-back').onclick = () => show(lbFrom);
+
+// ---------- liste ----------
+function sorted() {
+  const L = GAMES[game].low;
+  return Object.entries(players).sort((a, b) => {
+    const x = a[1].score, y = b[1].score;
+    if (x == null) return 1; if (y == null) return -1;
+    return L ? x - y : y - x;
+  });
+}
+function fmt(v) {
+  if (v == null) return '–';
+  if (game === 'reflex') return v >= 9999 ? 'erken bastı' : v >= 3000 ? 'basmadı' : v + ' ms';
+  return v;
+}
+function fill(el, withScore) {
+  el.innerHTML = '';
+  sorted().forEach(([id, p], i) => {
+    const li = document.createElement('li');
+    if (id === me.id) li.className = 'me';
+    const a = document.createElement('span');
+    a.textContent = (withScore ? ['🥇', '🥈', '🥉'][i] || (i + 1) + '.' : '•') + ' ' + p.name;
+    li.appendChild(a);
+    if (withScore) { const b = document.createElement('span'); b.textContent = fmt(p.score); li.appendChild(b); }
+    el.appendChild(li);
+  });
+}
+function render() { fill($('lobby-list'), false); fill($('game-list'), true); }
+</script>
+</body>
+</html>
